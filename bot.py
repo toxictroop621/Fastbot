@@ -1,6 +1,8 @@
+
 import asyncio
 import re
 import os
+import sys
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
@@ -27,6 +29,13 @@ API_ID = 28300452
 API_HASH = '7ad116378499f0ad2278dce2b28fbd28'
 SESSION_STRING = os.environ.get('SESSION_STRING', '')
 
+print(f"Session string exists: {bool(SESSION_STRING)}")
+print(f"Session length: {len(SESSION_STRING)}")
+
+if not SESSION_STRING:
+    print("❌ NO SESSION STRING! Check Render environment variables!")
+    sys.exit(1)
+
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ========== FAST WRITE GAME ==========
@@ -45,7 +54,6 @@ async def word_game(event):
 
 # ========== TEN THINGS - DETECT * PATTERN ==========
 def search_answer(query):
-    """Search DuckDuckGo for answer"""
     try:
         url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -63,9 +71,6 @@ def search_answer(query):
                     if len(answer) > 2:
                         return answer[:80]
         
-        if data.get('Answer'):
-            return data['Answer'][:80]
-        
         return None
     except:
         return None
@@ -75,26 +80,19 @@ async def ten_things_answer(event):
     try:
         text = event.message.text
         
-        # Check if message has * or ⁎ (hint pattern)
         if '*' not in text and '⁎' not in text:
             return
         
         print(f"\n🎮 GAME DETECTED!")
         print(f"📝 {text[:100]}")
         
-        # Get first line as topic
         lines = text.strip().split('\n')
         topic = lines[0].strip()
-        
-        # Remove any numbers from topic (like "1. " or "Topic: ")
         topic = re.sub(r'^\d+[\.\)]\s*', '', topic)
-        topic = re.sub(r'^Topic:\s*', '', topic)
         
-        # Find all hints (lines with * or ⁎)
         hints = []
         for line in lines:
             if '*' in line or '⁎' in line:
-                # Remove number prefix like "1: " or "1. "
                 clean = re.sub(r'^\d+[\.:\)]\s*', '', line)
                 hints.append(clean.strip())
         
@@ -104,13 +102,12 @@ async def ten_things_answer(event):
         print(f"📌 Topic: {topic}")
         
         for hint in hints:
-            # Clean hint - remove * and ⁎
             clean_hint = hint.replace('*', '').replace('⁎', '').strip()
             
             if len(clean_hint) < 2:
                 continue
             
-            print(f"🔍 Searching: {topic} {clean_hint}")
+            print(f"🔍 {clean_hint}")
             
             answer = search_answer(f"{topic} {clean_hint}")
             
@@ -119,28 +116,23 @@ async def ten_things_answer(event):
                 await event.respond(answer)
                 await asyncio.sleep(0.3)
             else:
-                # Try searching just the hint without topic
-                answer2 = search_answer(clean_hint)
-                if answer2:
-                    print(f"✅ {answer2}")
-                    await event.respond(answer2)
-                    await asyncio.sleep(0.3)
-                else:
-                    print(f"❌ No answer for: {clean_hint}")
+                print(f"❌ No answer")
     
     except Exception as e:
         print(f"Error: {e}")
 
 async def main():
-    await client.start()
-    print("\n" + "="*50)
-    print("🤖 ULTIMATE GAME BOT")
-    print("="*50)
-    print("⚡ FastWrite: AUTO (🔤 Word:)")
-    print("🎮 TenThings: AUTO (* or ⁎ hints)")
-    print("🔍 Search: DuckDuckGo")
-    print("📱 Works ANYWHERE 24/7")
-    print("="*50 + "\n")
-    await client.run_until_disconnected()
+    try:
+        print("Connecting to Telegram...")
+        await client.start()
+        print("\n✅ CONNECTED TO TELEGRAM!")
+        print("🤖 Bot is ACTIVE!")
+        print("="*50)
+        print("⚡ FastWrite: AUTO")
+        print("🎮 TenThings: AUTO")
+        print("="*50 + "\n")
+        await client.run_until_disconnected()
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
 
 asyncio.run(main())
